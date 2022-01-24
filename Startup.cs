@@ -1,7 +1,10 @@
+using EncryptionWebAPI.Data;
+using EncryptionWebAPI.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,7 +30,11 @@ namespace EncryptionWebAPI
         public void ConfigureServices(IServiceCollection services)
         {
 
+            services.AddDbContext<DataAnalyticsContext>(opt => opt.UseSqlServer
+                (Configuration.GetConnectionString("Connection")));
+
             services.AddControllers();
+            services.AddScoped<IEncryptionWebRepo, EncryptionWebRepo>();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "EncryptionWebAPI", Version = "v1" });
