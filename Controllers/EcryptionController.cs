@@ -33,9 +33,9 @@ namespace EncryptionWebAPI.Controllers
         [HttpPost("SaveAllData")]
         public async Task<ActionResult<PcAccounts1B>> SaveAllData(List<PcAccounts1B> model)
         {
-           var encryprionWeb = await encryptionWebRepo.SaveAllData(model);
+        //    var encryprionWeb = await encryptionWebRepo.SaveAllData(model);
 
-            return Ok(encryprionWeb);
+            return Ok(model);
         }
 
     }

@@ -1,4 +1,5 @@
-﻿using EncryptionWebAPI.Models;
+﻿using EncryptionWebAPI.DTO;
+using EncryptionWebAPI.Models;
 using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
@@ -10,7 +11,7 @@ namespace EncryptionWebAPI.Data
     public interface IEncryptionWebRepo
     {
         Task<IEnumerable<SaleZonesRegion>> GetAllSaleZone();
-        Task<IEnumerable<PcAccounts1B>> DecryptAllData();
-        Task<Boolean> SaveAllData(List<PcAccounts1B> model);
+        Task<bool> DecryptAllData();
+        Task<bool> SaveAllData(List<PcAccounts1BDTO> model);
     }
 }

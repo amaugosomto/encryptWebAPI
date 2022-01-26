@@ -15,6 +15,7 @@ using System.Text;
 using System.Net.Http.Headers;
 using EncryptionWebAPI.DTO;
 using System.Text.Json;
+using System.Reflection;
 
 namespace EncryptionWebAPI.Data
 {
@@ -38,15 +39,47 @@ namespace EncryptionWebAPI.Data
             return sales;
         }
 
-        public async Task<IEnumerable<PcAccounts1B>> DecryptAllData()
+        public async Task<bool> DecryptAllData()
         {
-            var accountids = await context.PcAccounts1Bs.ToListAsync();
-            var decrypedData = await GetDecryptedData(accountids);
-            await SaveAllData(decrypedData);
-            return accountids;
+            var total = await context.PcAccounts1Bs.CountAsync();
+            List<PcAccounts1BDTO> pcAccounts1Bs = new List<PcAccounts1BDTO>();
+            List<PcAccounts1BDTO> decryptedData = new List<PcAccounts1BDTO>();
+            var maxNum = 20000.0;
+
+            if (total < (int)maxNum)
+            {
+               pcAccounts1Bs = await context.PcAccounts1Bs.Select(x => new PcAccounts1BDTO(){ 
+                    AccountId = x.AccountId,
+                    AccountIdEncrypted =  x.AccountIdEncrypted
+               }).ToListAsync();
+
+                decryptedData = await GetDecryptedData(pcAccounts1Bs);
+                await SaveAllData(decryptedData);
+            }
+            else
+            {
+                var loopTotal = total % maxNum != 0 ? Math.Floor(total / maxNum) + 1 : total / maxNum;
+                var loopGotten = 0;
+
+                for (int i = 0; i < loopTotal; i++)
+                {
+                    pcAccounts1Bs = await context.PcAccounts1Bs.Select(x => new PcAccounts1BDTO()
+                    {
+                        AccountId = x.AccountId,
+                        AccountIdEncrypted = x.AccountIdEncrypted
+                    }).Skip(loopGotten).Take((int)maxNum).ToListAsync();
+
+                    loopGotten += pcAccounts1Bs.Count;
+
+                    decryptedData = await GetDecryptedData(pcAccounts1Bs);
+                    await SaveAllData(decryptedData);
+                }
+            }
+
+            return true;
         }
 
-        private async Task<List<PcAccounts1B>> GetDecryptedData(List<PcAccounts1B> data)
+        private async Task<List<PcAccounts1BDTO>> GetDecryptedData(List<PcAccounts1BDTO> data)
         {
             var username = "postcard_encrypt";
             var password = "Wema@1234";
@@ -56,13 +89,17 @@ namespace EncryptionWebAPI.Data
             var authToken = Encoding.ASCII.GetBytes($"{username}:{password}");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authToken));
 
-            foreach (var dat in data)
-            {
+            List<PcAccounts1BDTO> decryptedData = new List<PcAccounts1BDTO>();
+            dynamic expandoObject = new ExpandoObject();
+            Dictionary<string, string> dataToSend = new Dictionary<string, string>();
 
-                var dataToSend = new DataToSendDTO
-                {
-                    key1_enc = dat.AccountIdEncrypted
-                };
+            foreach (var item in data)
+            {
+                dataToSend.Add($"key_{item.AccountId}_enc", item.AccountIdEncrypted);
+            }
+
+            try
+            {
                 var toSend = JsonSerializer.Serialize(dataToSend);
                 var requestContent = new StringContent(toSend, Encoding.UTF8, "application/json");
 
@@ -70,15 +107,27 @@ namespace EncryptionWebAPI.Data
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
-                var decryptedContent = JsonSerializer.Deserialize<dynamic>(content);
+                var decryptedContent = JsonSerializer.Deserialize<Dictionary<string, string>>(content);
 
-                dat.AccountIdEncrypted = decryptedContent.key1_enc_dec;
+                PcAccounts1BDTO userToEdit = new PcAccounts1BDTO();
+                foreach (var item in decryptedContent)
+                {
+                    var userID = item.Key.Split('_')[1];
+                    userToEdit = data.Find(x => x.AccountId == userID);
+                    userToEdit.AccountIdEncrypted = item.Value;
+                }
+
+                decryptedData.Add(userToEdit);
+            }
+            catch (Exception ex)
+            {
+                return decryptedData;
             }
 
             return data;
         }
 
-        public async Task<Boolean> SaveAllData(List<PcAccounts1B> model)
+        public async Task<Boolean> SaveAllData(List<PcAccounts1BDTO> model)
         {
             try
             {
@@ -99,7 +148,8 @@ namespace EncryptionWebAPI.Data
 
                 return true;
             }
-
+            
         }
+
     }
 }
